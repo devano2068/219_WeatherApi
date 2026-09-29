@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Titik Bumi — Pencari Lokasi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{--bg:#0a0f1a;--panel:#101828;--field:#151f33;--line:#223049;--ink:#e8eef8;--muted:#8fa0ba;--accent:#4f9dff;--pin:#ffb020;--err:#ff7a8a}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;grid-template-rows:auto 1fr;background:var(--bg);color:var(--ink);font-family:"Manrope",system-ui,sans-serif;line-height:1.5}
+.top{display:flex;align-items:center;gap:10px;padding:14px 24px;border-bottom:1px solid var(--line)}
+.top b{font-weight:800;letter-spacing:-.01em}
+.top span{color:var(--muted);font-size:.9rem}
+main{display:grid;grid-template-columns:400px 1fr;min-height:0}
+aside{display:flex;flex-direction:column;gap:20px;padding:24px;overflow:auto;max-height:calc(100vh - 55px);border-right:1px solid var(--line)}
+h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+.lede{margin:4px 0 0;color:var(--muted);font-size:.95rem}
+form{display:flex;flex-direction:column;gap:10px}
+label{font-weight:700;font-size:.9rem}
+.row{display:flex;gap:8px}
+input{flex:1;min-width:0;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+input::placeholder{color:#5f708b}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,157,255,.25)}
+button{font:inherit;cursor:pointer}
+button[type=submit]{font-weight:700;color:#06101f;background:var(--accent);border:0;border-radius:10px;padding:0 18px}
+button[type=submit]:hover{background:#7ab4ff}
+button:disabled{opacity:.6;cursor:wait}
+button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+summary{cursor:pointer;color:var(--muted);font-size:.9rem;width:fit-content}
+#keyBox input{width:100%;margin-top:8px}
+small{display:block;margin-top:6px;color:var(--muted)}
+#status{margin:0;min-height:1.4em;font-size:.9rem;color:var(--muted)}
+#status.err{color:var(--err)}
+.hasil{display:flex;flex-direction:column;gap:6px}
+.hasil button{text-align:left;color:var(--muted);background:transparent;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:.88rem}
+.hasil button:hover{border-color:var(--accent)}
+.hasil button[aria-pressed=true]{color:var(--ink);background:var(--field);border-color:var(--accent)}
+h2{margin:0 0 10px;font-size:1.05rem;font-weight:700}
+.detail{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.r{display:flex;justify-content:space-between;gap:16px;padding:12px 16px;border-top:1px solid var(--line)}
+.r:first-child{border-top:0}
+.r span{color:var(--muted);font-size:.92rem}
+.r strong{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.raw pre{max-height:240px;overflow:auto;margin:8px 0 0;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:.75rem;color:var(--muted)}
+.mapbox{position:relative;min-height:420px;background:var(--bg)}
+#map{position:absolute;inset:0;background:var(--bg)}
+.leaflet-tile-pane{filter:brightness(.82) contrast(1.05)}
+.leaflet-container{font-family:"Manrope",sans-serif}
+.leaflet-bar a{background:var(--panel);color:var(--ink);border-color:var(--line)}
+.leaflet-bar a:hover{background:var(--field)}
+.leaflet-control-attribution{background:rgba(10,15,26,.8)!important;color:var(--muted)!important}
+.leaflet-control-attribution a{color:var(--accent)!important}
+.empty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1000;pointer-events:none;margin:0;padding:10px 16px;border-radius:999px;background:rgba(16,24,40,.88);border:1px solid var(--line);color:var(--muted);font-size:.9rem;text-align:center}
+.empty[hidden]{display:none}
+.pin span{display:block;width:18px;height:18px;border-radius:50%;background:var(--pin);border:3px solid #fff;animation:pulse 1.6s ease-out 2}
+@keyframes pulse{from{box-shadow:0 0 0 0 rgba(255,176,32,.7)}to{box-shadow:0 0 0 24px rgba(255,176,32,0)}}
+@media (max-width:860px){
+  main{grid-template-columns:1fr}
+  aside{max-height:none;border-right:0;border-bottom:1px solid var(--line)}
+  .mapbox{height:60vh}
+}
+@media (prefers-reduced-motion:reduce){.pin span{animation:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4f9dff" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg>
+  <b>Titik Bumi</b><span>Pencari lokasi dan koordinat</span>
+</header>
+<main>
+  <aside>
+    <div>
+      <h1>Cari lokasi</h1>
+      <p class="lede">Dapatkan negara, provinsi, kecamatan, latitude, dan longitude dari nama tempat.</p>
+    </div>
+
+    <form id="form" autocomplete="off">
+      <details id="keyBox">
+        <summary>API key MapTiler</summary>
+        <input id="apiKey" type="password" placeholder="Tempel API key di sini" aria-label="API key MapTiler">
+        <small>Disimpan di browser kamu saja, tidak ikut ke GitHub.</small>
+      </details>
+      <label for="query">Lokasi</label>
+      <div class="row">
+        <input id="query" type="text" placeholder="contoh: Bandung Wetan" required>
+        <button type="submit" id="go">Cari</button>
+      </div>
+      <p id="status" role="status" aria-live="polite"></p>
+    </form>
+
+    <div id="chips" class="hasil" aria-label="Hasil pencarian"></div>
+
+    <section id="result" hidden>
+      <h2 id="nama">-</h2>
+      <div class="detail">
+        <div class="r"><span>Negara</span><strong id="negara">-</strong></div>
+        <div class="r"><span>Provinsi</span><strong id="provinsi">-</strong></div>
+        <div class="r"><span>Kecamatan</span><strong id="kecamatan">-</strong></div>
+        <div class="r"><span>Latitude</span><strong id="lat">-</strong></div>
+        <div class="r"><span>Longitude</span><strong id="lon">-</strong></div>
+      </div>
+    </section>
+
+    <details class="raw">
+      <summary>Lihat respons JSON mentah</summary>
+      <pre id="raw">Belum ada data.</pre>
+    </details>
+  </aside>
+
+  <section class="mapbox" aria-label="Peta lokasi">
+    <div id="map"></div>
+    <p id="empty" class="empty">Belum ada titik. Cari lokasi untuk menampilkannya di peta.</p>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+// MapTiler (Indonesia): joint_municipality = kecamatan, municipality = desa/kelurahan,
+// county = kota/kabupaten, region = provinsi. Sesuaikan daftar ini kalau hasilnya beda.
+const KEC_PRIORITY = ['joint_municipality', 'municipal_district', 'municipality'];
+
+const $ = (id) => document.getElementById(id);
+const keyInput = $('apiKey');
+let features = [];
+
+keyInput.value = localStorage.getItem('maptiler_key') || '';
+if (!keyInput.value) $('keyBox').open = true;
+
+// ---------- peta gelap (Leaflet + tile MapTiler) ----------
+const map = L.map('map', { minZoom: 1, worldCopyJump: true }).setView([12, 20], 1);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let tiles = null, marker = null;
+
+function ensureMap(key) {
+  if (!key) return;
+  const url = `https://api.maptiler.com/maps/streets-v2-dark/{z}/{x}/{y}@2x.png?key=${encodeURIComponent(key)}`;
+  if (tiles) { tiles.setUrl(url); return; }
+  tiles = L.tileLayer(url, {
+    tileSize: 512, zoomOffset: -1, maxZoom: 19,
+    attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'
+  }).addTo(map);
+}
+ensureMap(keyInput.value.trim());
+
+function placePin(lon, lat, bbox) {
+  $('empty').hidden = true;
+  const pos = [lat, lon];
+  if (marker) marker.setLatLng(pos);
+  else marker = L.marker(pos, { icon: L.divIcon({ className: 'pin', html: '<span></span>', iconSize: [18, 18] }) }).addTo(map);
+
+  const [w, s, e, n] = bbox || [];
+  const area = bbox && (e - w > 0.0005 || n - s > 0.0005);
+  const opt = { maxZoom: 14, padding: [40, 40] };
+  if (area) {
+    const b = [[s, w], [n, e]];
+    reduceMotion ? map.fitBounds(b, opt) : map.flyToBounds(b, opt);
+  } else {
+    reduceMotion ? map.setView(pos, 12) : map.flyTo(pos, 12);
+  }
+}
+
+function clearPin() {
+  if (marker) { map.removeLayer(marker); marker = null; }
+  $('empty').hidden = false;
+}
+
+// ---------- pencarian ----------
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const key = keyInput.value.trim();
+  const q = $('query').value.trim();
+  if (!key) { $('keyBox').open = true; return setStatus('Isi API key MapTiler dulu.', true); }
+  if (!q) return setStatus('Ketik nama lokasi dulu.', true);
+  localStorage.setItem('maptiler_key', key);
+  ensureMap(key);
+
+  const url = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${encodeURIComponent(key)}&language=id&limit=5`;
+  $('go').disabled = true;
+  setStatus('Mencari…');
+  try {
+    const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) throw new Error('API key ditolak. Cek lagi key-nya di dashboard MapTiler.');
+    if (!res.ok) throw new Error('Server membalas dengan status ' + res.status + '.');
+    const data = await res.json();
+    $('raw').textContent = JSON.stringify(data, null, 2);
+    features = data.features || [];
+    if (!features.length) {
+      $('result').hidden = true;
+      $('chips').replaceChildren();
+      clearPin();
+      return setStatus('Lokasi tidak ditemukan. Coba nama yang lebih spesifik.', true);
+    }
+    setStatus(features.length + ' hasil ditemukan.');
+    renderList(0);
+    show(0);
+  } catch (err) {
+    setStatus(err.message || 'Gagal mengambil data.', true);
+  } finally {
+    $('go').disabled = false;
+  }
+});
+
+function setStatus(msg, isErr = false) {
+  const s = $('status');
+  s.textContent = msg;
+  s.className = isErr ? 'err' : '';
+}
+
+function renderList(active) {
+  const box = $('chips');
+  box.replaceChildren();
+  if (features.length < 2) return;
+  features.forEach((f, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = f.place_name || f.text;
+    b.setAttribute('aria-pressed', i === active);
+    b.addEventListener('click', () => { renderList(i); show(i); });
+    box.appendChild(b);
+  });
+}
+
+// ---------- parsing wilayah ----------
+function levels(f) {
+  const own = { type: (f.place_type && f.place_type[0]) || '', text: f.text };
+  const ctx = (f.context || []).map((c) => ({ type: String(c.id).split('.')[0], text: c.text }));
+  return [own, ...ctx];
+}
+const pick = (list, types) => {
+  for (const t of types) {
+    const hit = list.find((l) => l.type === t);
+    if (hit) return hit.text;
+  }
+  return '-';
+};
+
+function show(i) {
+  const f = features[i];
+  const list = levels(f);
+  const [lon, lat] = f.center;
+
+  $('nama').textContent = f.place_name || f.text;
+  $('negara').textContent = pick(list, ['country']);
+  $('provinsi').textContent = pick(list, ['region']);
+  $('kecamatan').textContent = pick(list, KEC_PRIORITY);
+  $('lat').textContent = lat.toFixed(5) + '° ' + (lat >= 0 ? 'LU' : 'LS');
+  $('lon').textContent = lon.toFixed(5) + '° ' + (lon >= 0 ? 'BT' : 'BB');
+  $('result').hidden = false;
+
+  placePin(lon, lat, f.bbox);
+}
+</script>
+</body>
+</html>
+
